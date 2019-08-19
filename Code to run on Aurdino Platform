@@ -1,0 +1,184 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#define        LED1 D0 // Red
+#define        LED2 D3 // Yellow
+#define        LED3 D4 // Green
+
+int delayTime = 0;
+#include <ESP8266WiFi.h>
+
+WiFiClient client;
+
+String MakerIFTTT_Key ;
+;String MakerIFTTT_Event;
+char *append_str(char *here, String s) {  int i=0; while (*here++ = s[i]){i++;};return here-1;}
+char *append_ul(char *here, unsigned long u) { char buf[20]; return append_str(here, ultoa(u, buf, 10));}
+char post_rqst[256];char *p;char *content_length_here;char *json_start;int compi;
+
+constexpr uint8_t RST_PIN = 5;     // Configurable, see typical pin layout above
+constexpr uint8_t SS_PIN = 4;     // Configurable, see typical pin layout above
+ 
+MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
+ 
+MFRC522::MIFARE_Key key; 
+ 
+// Init array that will store new NUID 
+byte nuidPICC[4];
+ 
+void setup() { 
+  Serial.begin(115200);
+  WiFi.disconnect();
+  delay(3000);
+  Serial.println("START");
+  WiFi.begin("*your_wifi_name*","*your_wifi_password");
+ while ((!(WiFi.status() == WL_CONNECTED))){
+    delay(300);
+    Serial.print("..");
+
+  }
+  Serial.println("Connected");
+  Serial.println("Your IP is");
+  Serial.println((WiFi.localIP().toString()));
+  SPI.begin(); // Init SPI bus
+  rfid.PCD_Init(); // Init MFRC522 
+ 
+  for (byte i = 0; i < 6; i++) {
+    key.keyByte[i] = 0xFF;
+    pinMode(LED1, OUTPUT);
+    pinMode(LED2, OUTPUT);
+    pinMode(LED3, OUTPUT);
+   
+  }
+ 
+  Serial.println(F("This code scan the MIFARE Classsic NUID."));
+  Serial.print(F("Using the following key:"));
+  printHex(key.keyByte, MFRC522::MF_KEY_SIZE);
+}
+ 
+void loop() {
+
+  if(delayTime == 0) {
+    digitalWrite(LED1, HIGH);
+    delayTime += 100;
+  }   
+ 
+  // Look for new cards
+  if ( ! rfid.PICC_IsNewCardPresent()) {
+   updateDelayTime();
+   return; 
+  }
+ 
+  // Verify if the NUID has been readed
+  if ( ! rfid.PICC_ReadCardSerial())
+    {
+   updateDelayTime();
+   return; 
+  }
+ 
+  Serial.print(F("PICC type: "));
+  MFRC522::PICC_Type piccType = rfid.PICC_GetType(rfid.uid.sak);
+  Serial.println(rfid.PICC_GetTypeName(piccType));
+ 
+  // Check is the PICC of Classic MIFARE type
+  if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&  
+    piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
+    piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
+    Serial.println(F("Your tag is not of type MIFARE Classic."));
+    updateDelayTime();
+    return;
+  }
+ 
+  if (rfid.uid.uidByte[0] != nuidPICC[0] || 
+    rfid.uid.uidByte[1] != nuidPICC[1] || 
+    rfid.uid.uidByte[2] != nuidPICC[2] || 
+    rfid.uid.uidByte[3] != nuidPICC[3] ) {
+    Serial.println(F("A new card has been detected."));
+ 
+    // Store NUID into nuidPICC array
+    for (byte i = 0; i < 4; i++) {
+      nuidPICC[i] = rfid.uid.uidByte[i];
+    }
+   
+    Serial.println(F("The NUID tag is:"));
+    Serial.print(F("In hex: "));
+    printHex(rfid.uid.uidByte, rfid.uid.size);
+    Serial.println();
+    Serial.print(F("In dec: "));
+    printDec(rfid.uid.uidByte, rfid.uid.size);
+    Serial.println();
+  }
+  else Serial.println(F("Card read previously."));
+ 
+  // Halt PICC
+  rfid.PICC_HaltA();
+ 
+  // Stop encryption on PCD
+  rfid.PCD_StopCrypto1();
+    if (client.connect("maker.ifttt.com",80)) {
+    MakerIFTTT_Key ="*your_IFTTT_key*";
+    MakerIFTTT_Event ="*your_IFTTT_event*";
+    p = post_rqst;
+    p = append_str(p, "POST /trigger/");
+    p = append_str(p, MakerIFTTT_Event);
+    p = append_str(p, "/with/key/");
+    p = append_str(p, MakerIFTTT_Key);
+    p = append_str(p, " HTTP/1.1\r\n");
+    p = append_str(p, "Host: maker.ifttt.com\r\n");
+    p = append_str(p, "Content-Type: application/json\r\n");
+    p = append_str(p, "Content-Length: ");
+    content_length_here = p;
+    p = append_str(p, "NN\r\n");
+    p = append_str(p, "\r\n");
+    json_start = p;
+    
+    compi= strlen(json_start);
+    content_length_here[0] = '0' + (compi/10);
+    content_length_here[1] = '0' + (compi%10);
+    client.print(post_rqst);
+
+  }
+}
+
+void updateDelayTime() {
+  
+delay(100);            // wait for 1 second.
+delayTime += 100;
+
+ if(delayTime == 3000) {
+  digitalWrite(LED1, LOW); // turn the LED on.
+ delayTime = 0;
+  delay(2000);
+
+  digitalWrite(LED2, HIGH); // Yellow 
+  delay(2000);
+  digitalWrite(LED2, LOW);
+  delay(2000);
+ 
+  digitalWrite(LED3, HIGH); // Green
+  delay(2000);
+  digitalWrite(LED3, LOW);
+  delay(2000);
+  
+ }
+}
+ 
+ 
+/**
+ * Helper routine to dump a byte array as hex values to Serial. 
+ */
+void printHex(byte *buffer, byte bufferSize) {
+  for (byte i = 0; i < bufferSize; i++) {
+    Serial.print(buffer[i] < 0x10 ? " 0" : " ");
+    Serial.print(buffer[i], HEX);
+  }
+}
+ 
+/**
+ * Helper routine to dump a byte array as dec values to Serial.
+ */
+void printDec(byte *buffer, byte bufferSize) {
+  for (byte i = 0; i < bufferSize; i++) {
+    Serial.print(buffer[i] < 0x10 ? " 0" : " ");
+    Serial.print(buffer[i], DEC);
+  }
+}

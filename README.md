@@ -27,3 +27,5 @@ D0  -  RED LED
 D3  -  YELLOW LED
 
 D4  -   GREEN LED
+
+For IFTTT  if this = Webhooks.....then that= Notification

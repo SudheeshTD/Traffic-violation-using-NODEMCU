@@ -5,7 +5,7 @@ If a vehicle violates the traffic when the light is red ,the system automaticall
 
 # CONNECTIONS:
 
-SIGNAL....................MFRC522 Reader.........................NODEMCU Pin
+SIGNAL....................MFRC522 Reader..........................NODEMCU Pin
 
 RST/Reset.......................RST.............................................D1
 

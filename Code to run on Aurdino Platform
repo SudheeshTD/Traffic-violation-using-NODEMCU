@@ -15,8 +15,8 @@ char *append_str(char *here, String s) {  int i=0; while (*here++ = s[i]){i++;};
 char *append_ul(char *here, unsigned long u) { char buf[20]; return append_str(here, ultoa(u, buf, 10));}
 char post_rqst[256];char *p;char *content_length_here;char *json_start;int compi;
 
-constexpr uint8_t RST_PIN = 5;     // Configurable, see typical pin layout above
-constexpr uint8_t SS_PIN = 4;     // Configurable, see typical pin layout above
+constexpr uint8_t RST_PIN = 5;     // Configurable, see typical pin layout in readme
+constexpr uint8_t SS_PIN = 4;     // Configurable, see typical pin layout in readme
  
 MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
  
